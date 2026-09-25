@@ -34,4 +34,39 @@ class TonalityEngineTest {
         assertEquals(listOf(NoteName.D, NoteName.E, NoteName.FS, NoteName.G, NoteName.A, NoteName.B, NoteName.CS), d.scaleNotes)
         assertEquals(listOf(NoteName.D, NoteName.FS, NoteName.A), d.chordNotes)
     }
+
+    @Test
+    fun repeatedSingleNote_neverProducesStableKey() {
+        val engine = TonalityEngine()
+        var estimate: KeyEstimate? = null
+        repeat(20) { index ->
+            estimate = engine.addPitch(pitch(NoteName.C), index * 200L)
+        }
+        estimate = engine.finish(4200L)
+        assertEquals(SampleQuality.INSUFFICIENT, estimate!!.sampleQuality)
+        assertTrue(!estimate!!.stable)
+        assertTrue(estimate!!.confidence <= 0.62)
+    }
+
+    @Test
+    fun completeCMajorPhrase_hasEnoughVariety() {
+        val engine = TonalityEngine()
+        val melody = listOf(NoteName.C, NoteName.E, NoteName.G, NoteName.B, NoteName.C, NoteName.G, NoteName.E, NoteName.C)
+        var time = 0L
+        melody.forEach { note ->
+            repeat(5) {
+                engine.addPitch(pitch(note), time)
+                time += 120L
+            }
+        }
+        val result = engine.finish(time)
+        assertEquals(SampleQuality.GOOD, result.sampleQuality)
+        assertTrue(result.uniqueNotes >= 4)
+    }
+
+    private fun pitch(note: NoteName): DetectedPitch {
+        val midi = 60 + note.ordinal
+        val frequency = 440.0 * Math.pow(2.0, (midi - 69.0) / 12.0)
+        return PitchConverter.fromFrequency(frequency, 0.96)
+    }
 }
