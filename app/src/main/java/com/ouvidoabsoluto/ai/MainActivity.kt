@@ -51,6 +51,8 @@ data class TonalityUiState(
     val voiceTimeMs: Long = 0,
     val noteEvents: Int = 0,
     val phrases: Int = 0,
+    val uniqueNotes: Int = 0,
+    val sampleQuality: SampleQuality = SampleQuality.INSUFFICIENT,
     val message: String = "Pronto para analisar"
 )
 
@@ -96,6 +98,7 @@ class TonalityViewModel(private val repository: TonalityRepository) : ViewModel(
             val message = when {
                 nextVoice < 2500 -> "Captando notas..."
                 estimate.best == null -> "Analisando tonalidade..."
+                estimate.sampleQuality == SampleQuality.LOW_VARIETY -> "Cante uma frase com mais notas diferentes"
                 estimate.relativeAmbiguous -> "Maior/menor relativo ainda ambíguo"
                 estimate.stable -> "Tonalidade estabilizada"
                 else -> "Refinando tonalidade..."
@@ -111,6 +114,8 @@ class TonalityViewModel(private val repository: TonalityRepository) : ViewModel(
                 voiceTimeMs = nextVoice,
                 noteEvents = estimate.events,
                 phrases = estimate.phrases,
+                uniqueNotes = estimate.uniqueNotes,
+                sampleQuality = estimate.sampleQuality,
                 message = message
             )
         }
@@ -126,6 +131,7 @@ class TonalityViewModel(private val repository: TonalityRepository) : ViewModel(
                 listening = false,
                 message = when {
                     snapshot.bestKey == null || snapshot.voiceTimeMs < 2500 -> "Análise inconclusiva"
+                    snapshot.sampleQuality != SampleQuality.GOOD -> "Amostra insuficiente — cante uma frase completa"
                     snapshot.relativeAmbiguous -> "Resultado provável — modo ainda ambíguo"
                     else -> "Análise concluída"
                 }
@@ -198,6 +204,25 @@ fun DetectorScreen(viewModel: TonalityViewModel) {
 
         item { Text(state.message) }
 
+        if (state.listening) {
+            item {
+                val progress = (state.voiceTimeMs / 12000f).coerceIn(0f, 1f)
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Qualidade da amostra", style = MaterialTheme.typography.titleSmall)
+                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                        Text(
+                            when (state.sampleQuality) {
+                                SampleQuality.INSUFFICIENT -> "Continue cantando por pelo menos 10–12 segundos."
+                                SampleQuality.LOW_VARIETY -> "Use uma frase completa, com notas graves e agudas."
+                                SampleQuality.GOOD -> "Boa amostra. Finalize a frase para confirmar o tom."
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
         state.currentPitch?.let { pitch ->
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -255,7 +280,7 @@ fun DetectorScreen(viewModel: TonalityViewModel) {
         }
 
         item {
-            Text("Voz analisada: ${"%.1f".format(state.voiceTimeMs / 1000.0)} s · ${state.noteEvents} notas · ${state.phrases} frases")
+            Text("Voz analisada: ${"%.1f".format(state.voiceTimeMs / 1000.0)} s · ${state.noteEvents} eventos · ${state.uniqueNotes} notas diferentes · ${state.phrases} frases")
         }
 
         item {
