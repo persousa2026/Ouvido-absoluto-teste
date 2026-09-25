@@ -1,4 +1,4 @@
-# Ouvido Absoluto AI — Android MVP 0.1
+# Ouvido Absoluto AI — Android MVP 0.5
 
 Primeira base executável do objetivo principal do app: ouvir uma pessoa cantando pelo microfone e estimar a tonalidade mais provável localmente.
 
@@ -51,3 +51,11 @@ O detector tonal desta versão é um MVP técnico. A arquitetura já está prepa
 ## Build sem PC — GitHub Actions
 
 A versão 0.4 inclui `.github/workflows/build-apk.yml`, que permite gerar o APK usando somente o GitHub pelo celular. Consulte `GUIA-CELULAR.md`.
+
+## MVP 0.5 — Precisão e qualidade da amostra
+
+- Troca de nota confirmada por três quadros consecutivos, reduzindo falsos eventos causados por vibrato e ruído.
+- Resultado estável exige tempo mínimo, cinco eventos e pelo menos quatro notas diferentes.
+- Confiança limitada quando a amostra é curta ou possui pouca variedade melódica.
+- Orientações ao vivo informam se é preciso continuar cantando ou variar mais as notas.
+- Testes automatizados garantem que uma única nota repetida não seja apresentada como tonalidade confiável.

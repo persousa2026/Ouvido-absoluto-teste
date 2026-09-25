@@ -46,7 +46,7 @@ Quando a execução estiver com o símbolo verde:
 3. Toque em **OuvidoAbsolutoAI-debug**.
 4. O GitHub baixa um ZIP do artefato.
 5. Extraia esse ZIP.
-6. Dentro estará `OuvidoAbsolutoAI-0.4-debug.apk`.
+6. Dentro estará `OuvidoAbsolutoAI-0.5-debug.apk`.
 7. Toque no APK para instalar.
 
 Na primeira instalação, o Android poderá pedir autorização para instalar aplicativos de fonte desconhecida para o navegador ou gerenciador de arquivos usado. Autorize somente para essa instalação se desejar.
@@ -54,6 +54,8 @@ Na primeira instalação, o Android poderá pedir autorização para instalar ap
 ## 6. Primeira execução
 
 Ao abrir o Ouvido Absoluto AI, permita o acesso ao microfone. O áudio é processado localmente no aparelho; o MVP não precisa enviar sua voz para um servidor.
+
+Para testar a precisão, cante uma frase musical completa durante 10 a 12 segundos. Evite sustentar apenas uma nota. O indicador de qualidade avisará quando houver tempo e variedade suficientes para um resultado confiável.
 
 ## Se o build ficar vermelho
 
