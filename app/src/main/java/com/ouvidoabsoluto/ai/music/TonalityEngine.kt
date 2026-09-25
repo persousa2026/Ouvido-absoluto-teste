@@ -19,9 +19,14 @@ data class KeyEstimate(
     val stable: Boolean,
     val events: Int,
     val phrases: Int,
+    val uniqueNotes: Int = 0,
+    val analyzedDurationMs: Long = 0L,
+    val sampleQuality: SampleQuality = SampleQuality.INSUFFICIENT,
     val relativeCandidate: KeyDetector.Candidate? = null,
     val relativeAmbiguous: Boolean = false
 )
+
+enum class SampleQuality { INSUFFICIENT, LOW_VARIETY, GOOD }
 
 class TonalityEngine(
     private val minimumNoteDurationMs: Long = 120L,
@@ -34,6 +39,8 @@ class TonalityEngine(
     private var activeLastSeenAt = 0L
     private var activeConfidenceSum = 0.0
     private var activeFrames = 0
+    private var pendingPitchClass: Int? = null
+    private var pendingFrames = 0
     private var lastEventEndAt = 0L
     private var phraseEndings = IntArray(12)
     private var phraseCount = 0
@@ -47,6 +54,8 @@ class TonalityEngine(
         activeLastSeenAt = 0L
         activeConfidenceSum = 0.0
         activeFrames = 0
+        pendingPitchClass = null
+        pendingFrames = 0
         lastEventEndAt = 0L
         phraseEndings = IntArray(12)
         phraseCount = 0
@@ -62,9 +71,21 @@ class TonalityEngine(
             activeLastSeenAt = timestamp
             activeConfidenceSum += pitch.confidence
             activeFrames++
+            pendingPitchClass = null
+            pendingFrames = 0
         } else {
-            closeActive(timestamp)
-            begin(pc, pitch.confidence, timestamp)
+            // Exige três quadros consecutivos antes de aceitar uma troca de nota.
+            // Isso evita que vibrato, ruído e transições rápidas contaminem o perfil tonal.
+            if (pendingPitchClass == pc) pendingFrames++ else {
+                pendingPitchClass = pc
+                pendingFrames = 1
+            }
+            if (pendingFrames >= 3) {
+                closeActive(timestamp)
+                begin(pc, pitch.confidence, timestamp)
+                pendingPitchClass = null
+                pendingFrames = 0
+            }
         }
         return estimate(timestamp)
     }
@@ -116,6 +137,8 @@ class TonalityEngine(
         activePitchClass = null
         activeConfidenceSum = 0.0
         activeFrames = 0
+        pendingPitchClass = null
+        pendingFrames = 0
     }
 
     private fun estimate(now: Long): KeyEstimate {
@@ -197,6 +220,12 @@ class TonalityEngine(
         val stability = if (best == null || recentBest.isEmpty()) 0.0 else recentBest.count { it == best.key }.toDouble() / recentBest.size
         val margin = if (best != null && second != null) (best.score - second.score).coerceAtLeast(0.0) else 0.0
         val avgPitch = if (confidenceCount == 0) 0.0 else averagePitchConfidence / confidenceCount
+        val uniqueNotes = durations.count { it >= minimumNoteDurationMs }
+        val quality = when {
+            totalDuration < 2500.0 || events.size < 3 -> SampleQuality.INSUFFICIENT
+            uniqueNotes < 4 -> SampleQuality.LOW_VARIETY
+            else -> SampleQuality.GOOD
+        }
         var rawConfidence = if (best == null) 0.0 else (
             best.score * 0.43 +
                 margin.coerceAtMost(0.30) * 0.70 +
@@ -205,7 +234,13 @@ class TonalityEngine(
             ).coerceIn(0.0, 1.0)
 
         if (relativeAmbiguous) rawConfidence = rawConfidence.coerceAtMost(0.68)
-        val stable = !relativeAmbiguous && stability >= 0.65 && margin >= 0.035 && events.size >= 4
+        rawConfidence = when (quality) {
+            SampleQuality.INSUFFICIENT -> rawConfidence.coerceAtMost(0.45)
+            SampleQuality.LOW_VARIETY -> rawConfidence.coerceAtMost(0.62)
+            SampleQuality.GOOD -> rawConfidence
+        }
+        val stable = quality == SampleQuality.GOOD && !relativeAmbiguous &&
+            stability >= 0.65 && margin >= 0.035 && events.size >= 5 && totalDuration >= 4000.0
         return KeyEstimate(
             best = best,
             alternatives = rescored.drop(1).take(3),
@@ -213,6 +248,9 @@ class TonalityEngine(
             stable = stable,
             events = events.size,
             phrases = phraseCount,
+            uniqueNotes = uniqueNotes,
+            analyzedDurationMs = totalDuration.toLong(),
+            sampleQuality = quality,
             relativeCandidate = relative,
             relativeAmbiguous = relativeAmbiguous
         )
